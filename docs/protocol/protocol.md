@@ -153,7 +153,7 @@ Shared request header:
 
 ```text
 +----------------+--------------------+----------------+
-| APIKey int16   | CorrelationID int32 | Body bytes     |
+| ApiKey int8    | CorrelationID int32 | Body bytes     |
 +----------------+--------------------+----------------+
 ```
 
@@ -165,12 +165,12 @@ Shared response header:
 +--------------------+----------------+
 ```
 
-`APIKey` identifies the request type for dispatch on the receiving listener.
+`ApiKey` identifies the request type for dispatch on the receiving listener.
 `CorrelationID` is chosen by the requester and must be copied unchanged into the
 matching response. `Body` is the component-specific request or response payload.
 
 Component API documents define their own request and response body fields.
-Listeners that support multiple APIs should dispatch by `APIKey`.
+Listeners that support multiple APIs should dispatch by `ApiKey`.
 
 Validation rules:
 
@@ -179,7 +179,7 @@ Validation rules:
 - `Length` must not exceed the configured maximum frame size.
 - Request frames must contain a complete shared request header.
 - Response frames must contain a complete shared response header.
-- `APIKey` must be known for the receiving listener.
+- `ApiKey` must be known for the receiving listener.
 - `CorrelationID` must be greater than zero.
 - `FrameData` body must decode according to the component API document for the
   receiving listener and request type.
@@ -305,7 +305,7 @@ Recommended server flow:
 3. Reject the connection if the length exceeds the configured maximum.
 4. Read exactly `Length` bytes.
 5. Decode the shared request header.
-6. Reject or close the connection if `APIKey` is unknown for the listener or
+6. Reject or close the connection if `ApiKey` is unknown for the listener or
    `CorrelationID` is invalid.
 7. Dispatch the request body to the appropriate handler.
 8. Encode exactly one response frame with the same `CorrelationID`.
@@ -355,7 +355,7 @@ Protocol implementation tests should cover:
 - multiple in-flight requests on one connection
 - response matching by `CorrelationID` when responses are returned out of order
 - rejection of duplicate in-flight `CorrelationID` values on one connection
-- rejection of unknown `APIKey` values
+- rejection of unknown `ApiKey` values
 - maximum frame size enforcement
 - connection close on incomplete or over-sized frames
 - connect, write, response read, and idle timeout behavior

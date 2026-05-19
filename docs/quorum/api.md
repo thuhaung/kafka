@@ -264,7 +264,7 @@ The first implementation must expose `RegisterBrokerAndFetchMetadata` and
 `FetchMetadataImage` over the binary TCP protocol defined in
 [protocol.md](../protocol/protocol.md). The logical wire schema must preserve:
 
-- the shared request header with `APIKey` and `CorrelationID`
+- the shared request header with `ApiKey` and `CorrelationID`
 - the shared response header with the matching `CorrelationID`
 - stable field names or field IDs
 - signed integer widths shown in the request schema
@@ -276,7 +276,7 @@ should use the network byte order defined by the protocol document.
 
 Startup API keys:
 
-| API | APIKey |
+| API | ApiKey |
 | --- | --- |
 | `RegisterBrokerAndFetchMetadata` | `1` |
 | `FetchMetadataImage` | `2` |

@@ -34,7 +34,7 @@ and derives broker-local leader partition state.
   quorum peer during startup discovery.
 - Broker-controller and controller-controller startup communication uses the
   binary TCP protocol defined in `docs/protocol/protocol.md`.
-- The binary TCP protocol includes a shared request header with `APIKey` and
+- The binary TCP protocol includes a shared request header with `ApiKey` and
   `CorrelationID`, plus a shared response header with the matching
   `CorrelationID`.
 - Controllers must support multiple in-flight startup requests on one
@@ -159,7 +159,7 @@ Out of scope:
    - Define controller redirect endpoint encoding.
    - Define shared request and response headers.
    - Define request type routing for controller listener frames through
-     `APIKey`.
+     `ApiKey`.
    - Allocate positive `CorrelationID` values per connection and track
      in-flight requests by ID.
    - Copy the request `CorrelationID` into every response.
@@ -172,7 +172,7 @@ Out of scope:
 7. Implement TCP transport.
    - Implement length-prefixed frame reader/writer.
    - Implement controller listener accept loop.
-   - Dispatch controller startup API requests to handlers by `APIKey`.
+   - Dispatch controller startup API requests to handlers by `ApiKey`.
    - Support multiple in-flight startup requests on a single connection.
    - Match responses to requests by `CorrelationID`, not response order.
    - Implement client calls with 10 second connect, frame write, response read,
@@ -292,7 +292,7 @@ Out of scope:
 6. Test protocol encoding and transport.
    - Frame reader/writer handles complete frames.
    - Malformed or oversized frames are rejected.
-   - Unknown `APIKey` values are rejected.
+   - Unknown `ApiKey` values are rejected.
    - Duplicate in-flight `CorrelationID` values on one connection are rejected.
    - `RegisterBrokerAndFetchMetadata` round-trips over TCP.
    - `FetchMetadataImage` round-trips over TCP.
