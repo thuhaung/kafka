@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"sync"
@@ -18,6 +19,11 @@ type Server struct {
 	handler codec.Handler
 }
 
+var (
+	ErrCannotListenOnPort = "Cannot listen on port"
+	ErrMaxConnections = "Maximum connections reached"
+)
+
 func NewServer(maxConnections int, codec codec.Codec, handler codec.Handler) *Server {
 	return &Server{
 		sem:     make(chan struct{}, maxConnections),
@@ -27,9 +33,9 @@ func NewServer(maxConnections int, codec codec.Codec, handler codec.Handler) *Se
 }
 
 func (s *Server) Start(ctx context.Context, port string) error {
-	listener, err := net.Listen("tcp", ":"+port)
+	listener, err := net.Listen("tcp", ":" + port)
 	if err != nil {
-		return err
+		return fmt.Errorf("%s %s: %w", ErrCannotListenOnPort, port, err)
 	}
 
 	s.listener = listener
