@@ -1,4 +1,4 @@
-package client
+package network
 
 import (
 	"errors"
@@ -9,22 +9,21 @@ import (
 	"time"
 
 	"github.com/thuhaung/kafka/internal/config"
-	"github.com/thuhaung/kafka/internal/protocol/codec"
 )
 
 type Client struct {
 	dest string
-	codec codec.Codec
+	transport Transport
 }
 
 var (
 	ErrRequestTimeout = errors.New("Request timed out")
 )
 
-func NewClient(dest string, codec codec.Codec) (*Client, error) {
+func NewClient(dest string, transport Transport) (*Client, error) {
 	return &Client{
-		dest,
-		codec,
+		dest:      dest,
+		transport: transport,
 	}, nil
 }
 
@@ -32,7 +31,7 @@ func isTimeout(err error) bool {
 	return errors.Is(err, os.ErrDeadlineExceeded)
 }
 
-func (client *Client) Send(request *codec.Request) (*codec.Response, error) {
+func (client *Client) Send(request *Request) (*Response, error) {
 	conn, err := net.DialTimeout("tcp", ":" + client.dest, config.API_TIMEOUT)
 	if err != nil {
 		if isTimeout(err) {
@@ -49,7 +48,7 @@ func (client *Client) Send(request *codec.Request) (*codec.Response, error) {
 
 	log.Println("Sending request to:", client.dest)
 
-	err = client.codec.WriteRequest(conn, request)
+	err = client.transport.WriteRequest(conn, request)
 	if err != nil {
 		if isTimeout(err) {
 			return nil, ErrRequestTimeout
@@ -61,7 +60,7 @@ func (client *Client) Send(request *codec.Request) (*codec.Response, error) {
 		return nil, fmt.Errorf("Error setting read deadline: %w", err)
 	}
 
-	response, err := client.codec.ReadResponse(conn)
+	response, err := client.transport.ReadResponse(conn)
 	if err != nil {
 		if isTimeout(err) {
 			return nil, ErrRequestTimeout

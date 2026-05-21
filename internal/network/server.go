@@ -1,4 +1,4 @@
-package server
+package network
 
 import (
 	"context"
@@ -6,8 +6,6 @@ import (
 	"log"
 	"net"
 	"sync"
-
-	"github.com/thuhaung/kafka/internal/protocol/codec"
 )
 
 type Server struct {
@@ -15,8 +13,8 @@ type Server struct {
 	wg       sync.WaitGroup
 	sem      chan struct{}
 
-	codec   codec.Codec
-	handler codec.Handler
+	transport Transport
+	handler Handler
 }
 
 var (
@@ -24,11 +22,11 @@ var (
 	ErrMaxConnections = "Maximum connections reached"
 )
 
-func NewServer(maxConnections int, codec codec.Codec, handler codec.Handler) *Server {
+func NewServer(maxConnections int, transport Transport, handler Handler) *Server {
 	return &Server{
-		sem:     make(chan struct{}, maxConnections),
-		codec:   codec,
-		handler: handler,
+		sem:       make(chan struct{}, maxConnections),
+		transport: transport,
+		handler:   handler,
 	}
 }
 
@@ -93,7 +91,7 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 	log.Println("Handling new connection from:", conn.RemoteAddr())
 
 	for {
-		request, err := s.codec.ReadRequest(conn)
+		request, err := s.transport.ReadRequest(conn)
 		if err != nil {
 			log.Println("Error reading request:", err)
 			return
@@ -105,7 +103,7 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 			return
 		}
 
-		err = s.codec.WriteResponse(conn, response)
+		err = s.transport.WriteResponse(conn, response)
 		if err != nil {
 			log.Println("Error writing response:", err)
 			return
