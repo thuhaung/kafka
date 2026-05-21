@@ -30,14 +30,14 @@ func NewServer(maxConnections int, transport Transport, handler Handler) *Server
 	}
 }
 
-func (s *Server) Start(ctx context.Context, port string) error {
-	listener, err := net.Listen("tcp", ":" + port)
+func (s *Server) Start(ctx context.Context, addr string) error {
+	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		return fmt.Errorf("%s %s: %w", ErrCannotListenOnPort, port, err)
+		return fmt.Errorf("%s %s: %w", ErrCannotListenOnPort, addr, err)
 	}
 
 	s.listener = listener
-	log.Println("Server listening on port:", port)
+	log.Println("Server listening on address:", addr)
 
 	go s.stop(ctx)
 
