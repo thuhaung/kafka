@@ -30,3 +30,36 @@ func ReadFile(path string) ([]byte, error) {
 
 	return os.ReadFile(path)
 }
+
+func CreateFile(path string) (*os.File, error) {
+	path, err := ResolveFilePath(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return os.Create(path)
+}
+
+func AppendToFile(path string, data []byte) error {
+	path, err := ResolveFilePath(path)
+	if err != nil {
+		return err
+	}
+
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	_, err = f.Write(data)
+	return err
+}
+
+func GetFileInfo(path string) (os.FileInfo, error) {
+	path, err := ResolveFilePath(path)
+	if err != nil {
+		return nil, err
+	}
+	return os.Stat(path)
+}

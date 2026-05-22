@@ -11,7 +11,7 @@ import (
 	"github.com/thuhaung/kafka/internal/config"
 )
 
-type Handler interface {
+type RequestHandler interface {
 	HandleRequest(ctx context.Context, request *Request) (*Response, error)
 }
 
@@ -26,8 +26,8 @@ type Transport interface {
 type KafkaTransport struct{}
 
 var (
-	ErrInvalidRequest = errors.New("Invalid request")
-	ErrInvalidResponse = errors.New("Invalid response")
+	ErrInvalidRequest    = errors.New("Invalid request")
+	ErrInvalidResponse   = errors.New("Invalid response")
 	ErrUnsupportedApiKey = errors.New("Unsupported API key")
 )
 

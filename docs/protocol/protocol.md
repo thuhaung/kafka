@@ -87,6 +87,9 @@ Recommended first-phase implementation:
 - use one goroutine to read frames from each accepted connection
 - dispatch decoded requests to request handlers after decoding the shared
   header
+- allow clients to expose a request dispatcher keyed by `ApiKey`, so
+  component-specific send paths can share one raw TCP client while still
+  centralizing per-request send behavior
 - use a serialized writer per connection so response bytes are not interleaved
 - track in-flight requests by `CorrelationID` on clients
 - set read limits before allocating payload buffers

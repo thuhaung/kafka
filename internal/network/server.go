@@ -14,15 +14,15 @@ type Server struct {
 	sem      chan struct{}
 
 	transport Transport
-	handler Handler
+	handler   RequestHandler
 }
 
 var (
 	ErrCannotListenOnPort = "Cannot listen on port"
-	ErrMaxConnections = "Maximum connections reached"
+	ErrMaxConnections     = "Maximum connections reached"
 )
 
-func NewServer(maxConnections int, transport Transport, handler Handler) *Server {
+func NewServer(maxConnections int, transport Transport, handler RequestHandler) *Server {
 	return &Server{
 		sem:       make(chan struct{}, maxConnections),
 		transport: transport,
@@ -64,21 +64,21 @@ func (s *Server) acceptConnections(ctx context.Context) {
 		conn, err := s.listener.Accept()
 		if err != nil {
 			select {
-				case <-ctx.Done():
-					return
-				default:
-					log.Println("Error accepting connection:", err)
-					continue
+			case <-ctx.Done():
+				return
+			default:
+				log.Println("Error accepting connection:", err)
+				continue
 			}
 		}
 
 		select {
-			case s.sem <- struct{}{}:
-				s.wg.Add(1)
-				go s.handleConnection(ctx, conn)
-			default:
-				log.Println("Max connections reached, rejecting new connection")
-				conn.Close()
+		case s.sem <- struct{}{}:
+			s.wg.Add(1)
+			go s.handleConnection(ctx, conn)
+		default:
+			log.Println("Max connections reached, rejecting new connection")
+			conn.Close()
 		}
 	}
 }
@@ -92,9 +92,9 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 
 	for {
 		select {
-			case <-ctx.Done():
-				return
-			default:
+		case <-ctx.Done():
+			return
+		default:
 		}
 
 		go func() {
