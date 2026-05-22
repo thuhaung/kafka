@@ -30,5 +30,5 @@ type LeaderPartitionState struct {
 
 type Broker struct {
 	nodeConfig *config.NodeConfig
-	server *network.Server
+	servers []*network.Server
 }

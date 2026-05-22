@@ -2,12 +2,14 @@ package broker
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"sync"
 
+	nodeconfig "github.com/thuhaung/kafka/internal/broker/config"
 	appconfig "github.com/thuhaung/kafka/internal/config"
 	"github.com/thuhaung/kafka/internal/network"
 	"github.com/thuhaung/kafka/internal/network/handlers"
-	nodeconfig "github.com/thuhaung/kafka/internal/broker/config"
 )
 
 type Options struct {
@@ -18,11 +20,7 @@ type Options struct {
 func NewBroker(nodeConfig *nodeconfig.NodeConfig) *Broker {
 	return &Broker{
 		nodeConfig: nodeConfig,
-		server: network.NewServer(
-			appconfig.MAX_CONNECTIONS,
-			&network.KafkaTransport{},
-			&handlers.BrokerHandler{},
-		),
+		servers: make([]*network.Server, len(nodeConfig.ListenerConfigs)),
 	}
 }
 
@@ -33,13 +31,28 @@ func Run(ctx context.Context, opts Options) error {
 	}
 
 	broker := NewBroker(nodeConfig)
+	var wg sync.WaitGroup
 
-	if err := broker.server.Start(ctx, opts.BootstrapServer); err != nil {
-		log.Fatal(err)
+	for i, listener := range nodeConfig.ListenerConfigs {
+		log.Printf("Starting listener on %s:%d", listener.Host, listener.Port)
+		addr := fmt.Sprintf("%s:%d", listener.Host, listener.Port)
+		wg.Add(1)
+
+		broker.servers[i] = network.NewServer(
+			appconfig.MAX_CONNECTIONS,
+			&network.KafkaTransport{},
+			&handlers.BrokerHandler{},
+		)
+
+		if err := broker.servers[i].Start(ctx, addr); err != nil {
+			wg.Done()
+			return err
+		}
 	}
 
-	broker.server.Wait()
-	log.Println("Server stopped")
+	for _, server := range broker.servers {
+		server.Wait()
+	}
 
 	return nil
 }

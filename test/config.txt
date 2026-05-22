@@ -1,10 +1,10 @@
 cluster.id=4f3e7f6e-7c46-4f9f-b0db-2dcf6d3c6c14
 process.roles=broker
-node.id=3
-listeners=PLAINTEXT://localhost:9096,CONTROLLER://localhost:9097
-advertised.listeners=PLAINTEXT://localhost:9096
+node.id=1
+listeners=PLAINTEXT://localhost:9092
+advertised.listeners=PLAINTEXT://localhost:9092
 listener.security.protocol.map=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
 inter.broker.listener.name=PLAINTEXT
 controller.listener.names=CONTROLLER
 controller.quorum.voters=1@localhost:9093,2@localhost:9094,3@localhost:9095
-log.dirs=kraft-cluster/node3
+log.dirs=kraft-cluster/node1

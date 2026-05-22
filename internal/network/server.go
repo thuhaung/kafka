@@ -64,21 +64,21 @@ func (s *Server) acceptConnections(ctx context.Context) {
 		conn, err := s.listener.Accept()
 		if err != nil {
 			select {
-			case <-ctx.Done():
-				return
-			default:
-				log.Println("Error accepting connection:", err)
-				continue
+				case <-ctx.Done():
+					return
+				default:
+					log.Println("Error accepting connection:", err)
+					continue
 			}
 		}
 
 		select {
-		case s.sem <- struct{}{}:
-			s.wg.Add(1)
-			go s.handleConnection(ctx, conn)
-		default:
-			log.Println("Max connections reached, rejecting new connection")
-			conn.Close()
+			case s.sem <- struct{}{}:
+				s.wg.Add(1)
+				go s.handleConnection(ctx, conn)
+			default:
+				log.Println("Max connections reached, rejecting new connection")
+				conn.Close()
 		}
 	}
 }
@@ -91,6 +91,17 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 	log.Println("Handling new connection from:", conn.RemoteAddr())
 
 	for {
+		select {
+			case <-ctx.Done():
+				return
+			default:
+		}
+
+		go func() {
+			<-ctx.Done()
+			conn.Close()
+		}()
+
 		request, err := s.transport.ReadRequest(conn)
 		if err != nil {
 			log.Println("Error reading request:", err)

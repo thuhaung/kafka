@@ -6,6 +6,9 @@ import (
 	"errors"
 	"io"
 	"net"
+	"time"
+
+	"github.com/thuhaung/kafka/internal/config"
 )
 
 type Handler interface {
@@ -29,11 +32,15 @@ var (
 )
 
 func (kt *KafkaTransport) ReadRequest(conn net.Conn) (*Request, error) {
+	if err := conn.SetReadDeadline(time.Now().Add(config.API_TIMEOUT)); err != nil {
+		return nil, err
+	}
+
 	buff := make([]byte, 4)
 
 	_, err := io.ReadFull(conn, buff)
 	if err != nil {
-		return nil, err
+		return nil, resolveErrorIfTimeout(err)
 	}
 
 	length := binary.BigEndian.Uint32(buff)
@@ -44,18 +51,22 @@ func (kt *KafkaTransport) ReadRequest(conn net.Conn) (*Request, error) {
 	data := make([]byte, length)
 	_, err = io.ReadFull(conn, data)
 	if err != nil {
-		return nil, err
+		return nil, resolveErrorIfTimeout(err)
 	}
 
 	request := &Request{}
 	if err := request.Decode(data); err != nil {
-		return nil, err
+		return nil, resolveErrorIfTimeout(err)
 	}
 
 	return request, nil
 }
 
 func (kt *KafkaTransport) WriteRequest(conn net.Conn, request *Request) error {
+	if err := conn.SetWriteDeadline(time.Now().Add(config.API_TIMEOUT)); err != nil {
+		return err
+	}
+
 	body, err := request.Encode()
 	if err != nil {
 		return err
@@ -65,18 +76,23 @@ func (kt *KafkaTransport) WriteRequest(conn net.Conn, request *Request) error {
 	binary.BigEndian.PutUint32(prefix, uint32(len(body)))
 
 	if err := writeFull(conn, prefix); err != nil {
-		return err
+		return resolveErrorIfTimeout(err)
 	}
 
-	return writeFull(conn, body)
+	err = writeFull(conn, body)
+	return resolveErrorIfTimeout(err)
 }
 
 func (kt *KafkaTransport) ReadResponse(conn net.Conn) (*Response, error) {
+	if err := conn.SetReadDeadline(time.Now().Add(config.API_TIMEOUT)); err != nil {
+		return nil, err
+	}
+
 	buff := make([]byte, 4)
 
 	_, err := io.ReadFull(conn, buff)
 	if err != nil {
-		return nil, err
+		return nil, resolveErrorIfTimeout(err)
 	}
 
 	length := binary.BigEndian.Uint32(buff)
@@ -87,18 +103,22 @@ func (kt *KafkaTransport) ReadResponse(conn net.Conn) (*Response, error) {
 	data := make([]byte, length)
 	_, err = io.ReadFull(conn, data)
 	if err != nil {
-		return nil, err
+		return nil, resolveErrorIfTimeout(err)
 	}
 
 	response := &Response{}
 	if err := response.Decode(data); err != nil {
-		return nil, err
+		return nil, resolveErrorIfTimeout(err)
 	}
 
 	return response, nil
 }
 
 func (kt *KafkaTransport) WriteResponse(conn net.Conn, response *Response) error {
+	if err := conn.SetWriteDeadline(time.Now().Add(config.API_TIMEOUT)); err != nil {
+		return err
+	}
+
 	body, err := response.Encode()
 	if err != nil {
 		return err
@@ -107,8 +127,9 @@ func (kt *KafkaTransport) WriteResponse(conn net.Conn, response *Response) error
 	prefix := make([]byte, 4)
 	binary.BigEndian.PutUint32(prefix, uint32(len(body)))
 	if err := writeFull(conn, prefix); err != nil {
-		return err
+		return resolveErrorIfTimeout(err)
 	}
 
-	return writeFull(conn, body)
+	err = writeFull(conn, body)
+	return resolveErrorIfTimeout(err)
 }

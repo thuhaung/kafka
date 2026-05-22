@@ -1,6 +1,11 @@
 package network
 
-import "net"
+import (
+	"errors"
+	"fmt"
+	"net"
+	"os"
+)
 
 func writeFull(conn net.Conn, data []byte) error {
 	totalWritten := 0
@@ -26,4 +31,11 @@ func validateResponse(response Response) error {
 		return ErrInvalidResponse
 	}
 	return nil
+}
+
+func resolveErrorIfTimeout(err error) error {
+	if errors.Is(err, os.ErrDeadlineExceeded) {
+		return fmt.Errorf("%w: %d", ErrRequestTimeout, err)
+	}
+	return err
 }
