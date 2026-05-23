@@ -9,11 +9,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/thuhaung/kafka/internal/storage"
-)
-
-var (
-	ErrInvalidConfig = errors.New("Invalid config")
 )
 
 const (
@@ -26,7 +23,20 @@ const (
 	propertyInterBrokerListenerName = "inter.broker.listener.name"
 	propertyControllerListenerNames = "controller.listener.names"
 	propertyControllerQuorumVoters  = "controller.quorum.voters"
-	propertyLogDirs                 = "log.dirs"
+	propertyLogDirs                 = "log.dir"
+	propertyIsLeader                = "is.leader"
+)
+
+var (
+	ErrInvalidConfig           = errors.New("Invalid config")
+	ErrInvalidClusterID        = errors.New("Invalid " + propertyClusterID)
+	ErrInvalidLogDir           = errors.New("Invalid " + propertyLogDirs)
+	ErrInvalidListenerProtocol = errors.New("Invalid listener protocol. Only PLAINTEXT is supported for broker-client communication and CONTROLLER is supported for controller communication at the moment")
+	ErrInvalidRole             = errors.New("Invalid " + propertyProcessRoles)
+	ErrEmptyListeners          = errors.New("At least one listener must be configured")
+	ErrEmptyControllerQuorum     = errors.New("Controller quorum voters must be configured for controller role")
+	ErrInvalidNodeID 		   = errors.New("Invalid " + propertyNodeID)
+	ErrControllerNotFoundInQuorum = errors.New("Controller node ID must be included in controller quorum voters")
 )
 
 func ParseConfig(path string) (*NodeConfig, error) {
@@ -44,6 +54,12 @@ func ParseConfig(path string) (*NodeConfig, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if err := validateConfig(config); err != nil {
+		return nil, err
+	}
+
+	resolveConfig(config)
 
 	return config, nil
 }
@@ -98,6 +114,12 @@ func buildNodeConfig(properties map[string]string) (*NodeConfig, error) {
 				return nil, err
 			}
 			config.Role = role
+		case propertyIsLeader:
+			isLeader, err := parseIsLeader(value)
+			if err != nil {
+				return nil, err
+			}
+			config.IsLeader = isLeader
 		case propertyNodeID:
 			nodeID, err := strconv.Atoi(value)
 			if err != nil {
@@ -146,6 +168,18 @@ func buildNodeConfig(properties map[string]string) (*NodeConfig, error) {
 	}
 
 	return config, nil
+}
+
+func parseIsLeader(value string) (bool, error) {
+	trimmed := strings.TrimSpace(value)
+	switch trimmed {
+	case "true", "True", "TRUE":
+		return true, nil
+	case "false", "False", "FALSE":
+		return false, nil
+	default:
+		return false, fmt.Errorf("%w: invalid boolean value %q for is.leader", ErrInvalidConfig, value)
+	}
 }
 
 func parseRole(value string) (Role, error) {
@@ -283,4 +317,81 @@ func splitCSV(value string) []string {
 	}
 
 	return parts
+}
+
+func validateConfig(config *NodeConfig) error {
+	if err := uuid.Validate(config.ClusterID); err != nil {
+		return fmt.Errorf("%w: %v", ErrInvalidClusterID, err)
+	}
+
+	if config.LogDir == "" {
+		return ErrInvalidLogDir
+	} else {
+		if _, err := storage.CheckFolderExists(config.LogDir); err != nil {
+			return fmt.Errorf("%w: %v", ErrInvalidLogDir, err)
+		}
+	}
+
+	if config.Role == "" {
+		return ErrInvalidRole
+	}
+
+	if config.Role == RoleBroker && config.IsLeader {
+		return ErrInvalidRole
+	}
+
+	if config.NodeID < 0 {
+		return ErrInvalidNodeID
+	}
+
+	if len(config.ControllerQuorum) == 0 {
+		return ErrEmptyControllerQuorum
+	} else {
+		if config.Role == RoleController {
+			for _, endpoint := range config.ControllerQuorum {
+				if endpoint.NodeID < 0 {
+					return ErrInvalidNodeID
+				}
+				if endpoint.NodeID == config.NodeID {
+					break
+				}
+			}
+			return ErrControllerNotFoundInQuorum
+		}
+	}
+
+	if config.InterBrokerListener != PlaintextListener || config.ControllerListener != ControllerListener {
+		return ErrInvalidListenerProtocol
+	}
+
+	if len(config.ListenerConfigs) == 0 {
+		return ErrEmptyListeners
+	} else {
+		for _, listener := range config.ListenerConfigs {
+			if listener.Type != PlaintextListener && listener.Type != ControllerListener {
+				return ErrInvalidListenerProtocol
+			}
+		}
+	}
+
+	return nil
+}
+
+func resolveConfig(config *NodeConfig) {
+	if len(config.AdvertisedListeners) == 0 {
+		config.AdvertisedListeners = config.ListenerConfigs
+	}
+	if config.IsLeader {
+		for _, endpoint := range config.ControllerQuorum {
+			if endpoint.NodeID == config.NodeID {
+				config.LeaderController = &ControllerEndpoint{
+					NodeID: endpoint.NodeID,
+					Host:   endpoint.Host,
+					Port:   endpoint.Port,
+				}
+				break
+			}
+		}
+
+	}
 }

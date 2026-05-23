@@ -36,6 +36,7 @@ type NodeConfig struct {
 	ClusterID           string
 	NodeID              int
 	Role                Role
+	IsLeader			bool
 	LogDir              string
 	ListenerConfigs     []ListenerConfig
 	ControllerQuorum    []ControllerEndpoint

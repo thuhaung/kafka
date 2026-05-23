@@ -13,7 +13,7 @@ The startup loader should reuse the shared node validation rules from
 - `process.roles` must be exactly `controller`.
 - `is.leader` must parse as a boolean.
 - `metadata.log.dir` must be present and non-empty.
-- The configured controller listener must be present.
+- Both configured `PLAINTEXT` and `CONTROLLER` listeners must be present.
 - The loaded or fetched metadata image must match `ClusterID`.
 - A controller must parse `controller.quorum.voters`, even when it is currently
   configured as the leader controller.

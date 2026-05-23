@@ -65,9 +65,9 @@ During the node's lifetime:
 - broker-to-broker communication uses the `PLAINTEXT` listener metadata
 - broker-to-controller communication uses `LeaderController` when the node role
   is `broker` and discovery has completed
-- broker nodes still configure a `CONTROLLER` listener in this phase, even
-  though that listener is primarily reserved for later controller failover and
-  quorum-membership work
+- every node keeps both `PLAINTEXT` and `CONTROLLER` listener metadata in this
+  phase so the configuration shape stays stable as later phases allow broker
+  and controller responsibilities to move between nodes
 - local storage paths use `LogDir`
 - role checks use the `Role` field
 - leader-only partition work uses the broker-local leader partition state
@@ -129,8 +129,8 @@ The first-phase behavior is:
   by `config.path`
 - the broker picks a random controller endpoint from that quorum configuration
 - the broker sends `RegisterBrokerAndFetchMetadata` using `ClusterID`,
-  `NodeID`, advertised broker listener metadata, and controller listener
-  metadata
+  `NodeID`, and advertised listener metadata for both broker and controller
+  communication
 - if the contacted controller is not the leader, it returns `NOT_LEADER`
   together with the actual leader node ID and leader address
 - the broker stores that returned endpoint in memory as `LeaderController`
@@ -203,7 +203,7 @@ conditions occur:
 - invalid or missing cluster ID
 - invalid `controller.quorum.voters` formatting
 - empty controller quorum for a broker-role or controller-role node
-- multiple log directories configured in this first phase
+- missing or invalid `log.dir`
 - failure to contact a controller before the startup timeout
 - terminal protocol error from the controller
 - fetched metadata image cluster ID mismatch
@@ -239,7 +239,7 @@ The broker configuration layer should explicitly handle:
   conflicts with the existing registration for the same node ID
 - failure to build leader partition state from the returned metadata image
 - invalid host or port formatting
-- multiple log directories configured in this first phase
+- missing or invalid `log.dir`
 
 Behaviors:
 

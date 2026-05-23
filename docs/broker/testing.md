@@ -10,7 +10,7 @@ layer.
 
 The broker loader and startup path must enforce:
 
-- `node.id` parses as an integer.
+- `node.id` parses as an integer, and `0` is valid.
 - `cluster.id` is present and parses as a UUID.
 - `process.roles` contains exactly one supported role.
 - `listeners` defines only supported listener types.
@@ -22,9 +22,8 @@ The broker loader and startup path must enforce:
 - `controller.listener.names` is `CONTROLLER`.
 - `controller.quorum.voters` parses into one or more controller endpoints for
   broker and controller nodes.
-- `log.dirs` resolves to exactly one local directory in this phase.
-- Broker-role nodes configure both `PLAINTEXT` and `CONTROLLER` listeners.
-- Controller-role nodes configure a `CONTROLLER` listener.
+- `log.dir` resolves to exactly one local directory in this phase.
+- Every node configures both `PLAINTEXT` and `CONTROLLER` listeners.
 
 ## Failure Modes
 
@@ -55,7 +54,7 @@ The broker implementation should explicitly handle:
   conflicts with the existing registration for the same node ID
 - failure to build leader partition state from the returned metadata image
 - invalid host or port formatting
-- multiple log directories configured in this first phase
+- missing or invalid `log.dir`
 
 Expected behavior:
 

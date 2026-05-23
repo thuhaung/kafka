@@ -31,6 +31,23 @@ func ReadFile(path string) ([]byte, error) {
 	return os.ReadFile(path)
 }
 
+func CheckFolderExists(path string) (bool, error) {
+	path, err := ResolveFilePath(path)
+	if err != nil {
+		return false, err
+	}
+	
+	info, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	
+	return info.IsDir(), nil
+}
+
 func CreateFile(path string) (*os.File, error) {
 	path, err := ResolveFilePath(path)
 	if err != nil {

@@ -32,7 +32,7 @@ A node may run as exactly one role in this phase:
 Only two listener types are supported in this phase:
 
 - `PLAINTEXT`: used for broker-client and broker-broker traffic
-- `CONTROLLER`: used for broker-controller traffic
+- `CONTROLLER`: used for broker-controller and controller-controller traffic
 
 Custom listener names are not supported.
 
@@ -41,7 +41,13 @@ Because of that restriction, `ListenerConfigs` may contain at most:
 - one `PLAINTEXT` listener
 - one `CONTROLLER` listener
 
-So the maximum number of configured listeners is `2`.
+Every node should configure both listener types in this phase:
+
+- one `PLAINTEXT` listener
+- one `CONTROLLER` listener
+
+This keeps the node metadata shape stable as later phases allow broker and
+controller responsibilities to move between nodes.
 
 ### Listener Fields
 
@@ -82,12 +88,12 @@ cluster.id=4f3e7f6e-7c46-4f9f-b0db-2dcf6d3c6c14
 process.roles=broker
 node.id=3
 listeners=PLAINTEXT://localhost:9096,CONTROLLER://localhost:9097
-advertised.listeners=PLAINTEXT://localhost:9096
+advertised.listeners=PLAINTEXT://localhost:9096,CONTROLLER://localhost:9097
 listener.security.protocol.map=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
 inter.broker.listener.name=PLAINTEXT
 controller.listener.names=CONTROLLER
 controller.quorum.voters=1@localhost:9093,2@localhost:9094,3@localhost:9095
-log.dirs=kraft-cluster/node3
+log.dir=kraft-cluster/node3
 ```
 
 ## Field Mapping
@@ -98,14 +104,14 @@ The initial implementation should interpret the properties file as follows.
 | --- | --- | --- |
 | `cluster.id` | ClusterID | Persisted UUID for the cluster |
 | `process.roles` | Role | Exactly one role in this phase |
-| `node.id` | NodeID | Integer node identifier |
+| `node.id` | NodeID | Integer node identifier. `0` is valid |
 | `listeners` | ListenerConfigs | Declares local listeners |
-| `advertised.listeners` | advertised listener metadata | Only `PLAINTEXT` is expected in this phase |
+| `advertised.listeners` | advertised listener metadata | Externally reachable listener addresses for this node. It may include both `PLAINTEXT` and `CONTROLLER` |
 | `listener.security.protocol.map` | SecurityProtocol per listener type | Must resolve both supported listeners to `PLAINTEXT` |
 | `inter.broker.listener.name` | broker listener selection | Must be `PLAINTEXT` in this phase |
 | `controller.listener.names` | controller listener selection | Must be `CONTROLLER` in this phase |
 | `controller.quorum.voters` | ControllerQuorum | Brokers and non-leader controllers choose one controller from this set during startup |
-| `log.dirs` | LogDir | Single local directory in this phase |
+| `log.dir` | LogDir | Single local directory in this phase |
 
 ### Cluster ID
 
@@ -167,22 +173,24 @@ Implementation notes:
   string in the struct
 - `Role` must contain exactly one supported value
 - `SecurityProtocol` defaults to `PLAINTEXT`
-- `LogDir` is a single directory in this phase even if the property name is
-  `log.dirs`
+- `LogDir` is a single directory loaded from `log.dir` in this phase
 - `ListenerConfigs` must contain no duplicate listener types
 - `ControllerQuorum` should be parsed from `controller.quorum.voters` for both
   broker and controller roles
 - `LeaderController` is not loaded from disk and is populated only after
   successful startup discovery for broker-role nodes and non-leader controller
   nodes
-- `AdvertisedListeners` should be limited to the externally reachable broker
-  listener metadata needed in this phase
+- `AdvertisedListeners` should contain the externally reachable listener
+  metadata other clients, brokers, and controllers use to connect to this node
+- when `AdvertisedListeners` contains a `CONTROLLER` listener, it should match
+  the controller endpoint advertised through `controller.quorum.voters` for the
+  same node ID
 
 ## Validation Rules
 
 The startup loader should enforce these rules:
 
-- `node.id` must parse as an integer
+- `node.id` must parse as an integer, and `0` is valid
 - `cluster.id` must be present and must parse as a UUID
 - `process.roles` must contain exactly one supported role
 - `listeners` must define only supported listener types
@@ -194,7 +202,5 @@ The startup loader should enforce these rules:
 - `controller.listener.names` must be `CONTROLLER`
 - `controller.quorum.voters` must parse into one or more controller endpoints
   for broker and controller nodes
-- `log.dirs` must resolve to exactly one local directory in this phase
-- if the node role is `broker`, both `PLAINTEXT` and `CONTROLLER` listeners
-  must be configured
-- if the node role is `controller`, a `CONTROLLER` listener must be configured
+- `log.dir` must resolve to exactly one local directory in this phase
+- every node must configure both `PLAINTEXT` and `CONTROLLER` listeners
