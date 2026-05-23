@@ -37,12 +37,20 @@ func CreateFile(path string) (*os.File, error) {
 		return nil, err
 	}
 
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return nil, err
+	}
+
 	return os.Create(path)
 }
 
 func AppendToFile(path string, data []byte) error {
 	path, err := ResolveFilePath(path)
 	if err != nil {
+		return err
+	}
+
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
 	}
 
