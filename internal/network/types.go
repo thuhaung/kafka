@@ -42,7 +42,7 @@ func (response *Response) Decode(data []byte) error {
 
 	*response = Response{
 		CorrelationID: decoder.ReadInt32(),
-		Body: decoder.ReadBytes(decoder.Remaining()),
+		Body:          decoder.ReadBytes(decoder.Remaining()),
 	}
 	if decoder.GetError() != nil {
 		return decoder.GetError()
@@ -75,9 +75,9 @@ func (request *Request) Decode(data []byte) error {
 	decoder := protocol.NewDecoder(data)
 
 	*request = Request{
-		ApiKey: decoder.ReadInt8(),
+		ApiKey:        decoder.ReadInt8(),
 		CorrelationID: decoder.ReadInt32(),
-		Body: decoder.ReadBytes(decoder.Remaining()),
+		Body:          decoder.ReadBytes(decoder.Remaining()),
 	}
 	if decoder.GetError() != nil {
 		return decoder.GetError()
@@ -91,4 +91,7 @@ func (request *Request) Decode(data []byte) error {
 
 type ApiKey int
 
-const ()
+const (
+	RegisterBrokerAndFetchMetadataAPIKey ApiKey = 1
+	FetchMetadataImageAPIKey             ApiKey = 2
+)

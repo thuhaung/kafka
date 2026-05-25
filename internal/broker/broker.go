@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"sync"
 
 	nodeconfig "github.com/thuhaung/kafka/internal/broker/config"
 	appconfig "github.com/thuhaung/kafka/internal/config"
@@ -30,13 +29,20 @@ func Run(ctx context.Context, opts Options) error {
 		return err
 	}
 
+	log.Printf("Parsed broker config: %v", nodeConfig)
+	log.Printf("Starting broker with node ID %d, cluster ID %s, and role %s", nodeConfig.NodeID, nodeConfig.ClusterID, nodeConfig.Role)
+
 	broker := NewBroker(nodeConfig)
-	var wg sync.WaitGroup
+
+	if broker.nodeConfig.Role == nodeconfig.RoleController {
+		if err := broker.startController(); err != nil {
+			return err
+		}
+	}
 
 	for i, listener := range nodeConfig.ListenerConfigs {
-		log.Printf("Starting listener %s on %s:%d", listener.Type, listener.Host, listener.Port)
+		log.Printf("Starting listener %s on %s: %d for broker of node ID %d", listener.Type, listener.Host, listener.Port, nodeConfig.NodeID)
 		addr := fmt.Sprintf("%s:%d", listener.Host, listener.Port)
-		wg.Add(1)
 
 		broker.servers[i] = network.NewServer(
 			appconfig.MAX_CONNECTIONS,
@@ -45,7 +51,6 @@ func Run(ctx context.Context, opts Options) error {
 		)
 
 		if err := broker.servers[i].Start(ctx, addr); err != nil {
-			wg.Done()
 			return err
 		}
 	}

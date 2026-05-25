@@ -13,26 +13,26 @@ import (
 )
 
 const (
-    TopicCreationRecordType      uint8 = 1
-    PartitionCreationRecordType  uint8 = 2
-    PartitionUpdateRecordType    uint8 = 3
-    BrokerRegistrationRecordType uint8 = 4
+	TopicCreationRecordType      uint8 = 1
+	PartitionCreationRecordType  uint8 = 2
+	PartitionUpdateRecordType    uint8 = 3
+	BrokerRegistrationRecordType uint8 = 4
 )
 
 type RecordEnvelope struct {
-    Type uint8
-    Data []byte
+	Type uint8
+	Data []byte
 }
 
 var currentImage atomic.Pointer[Image]
 
 func NewEmptyImage(clusterID string) *Image {
 	return &Image{
-		ClusterID: clusterID,
+		ClusterID:     clusterID,
 		AppliedOffset: -1,
-		Topics: make(map[string]TopicMetadata),
-		Partitions: make(map[PartitionKey]PartitionMetadata),
-		Brokers: make(map[int32]BrokerMetadata),
+		Topics:        make(map[string]TopicMetadata),
+		Partitions:    make(map[PartitionKey]PartitionMetadata),
+		Brokers:       make(map[int32]BrokerMetadata),
 	}
 }
 
@@ -51,37 +51,50 @@ func (image *Image) BuildImage(logDir string) error {
 
 	offset := int64(0)
 	for _, fileInfo := range fileInfos {
+		if !strings.HasSuffix(fileInfo.Name(), ".log") {
+			continue
+		}
+
 		position := int64(0)
-		if strings.HasSuffix(fileInfo.Name(), ".log") {
-			filePath := filepath.Join(partitionPath, fileInfo.Name())
-			log.Printf("Processing log file %s at offset %d and position %d", filePath, offset, position)
+		filePath := filepath.Join(partitionPath, fileInfo.Name())
+		log.Printf("Processing log file %s starting at offset %d", filePath, offset)
 
-			file, err := segment.OpenLogFile(filePath)
-			if err != nil {
-				return err
-			}
+		file, err := segment.OpenLogFile(filePath)
+		if err != nil {
+			return err
+		}
 
+		for position < fileInfo.Size() {
 			recordHeader, err := segment.ReadRecordHeaderAt(file, position)
 			if err != nil {
+				file.Close()
 				return err
 			}
 
 			err = segment.ValidateRecordHeader(offset, position, fileInfo.Size(), recordHeader)
 			if err != nil {
+				file.Close()
 				return err
 			}
 
 			record, err := segment.ReadRecordAt(file, position, recordHeader.Length)
 			if err != nil {
+				file.Close()
 				return err
 			}
 
 			if err := image.applyChanges(record); err != nil {
+				file.Close()
 				return err
 			}
 
+			image.AppliedOffset = offset
 			offset++
 			position += int64(recordHeader.Length) + segment.HeaderSize
+		}
+
+		if err := file.Close(); err != nil {
+			return err
 		}
 	}
 

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"strconv"
@@ -37,6 +38,8 @@ var (
 )
 
 func ParseConfig(path string) (*NodeConfig, error) {
+	log.Printf("Parsing broker config from %s", path)
+	
 	path, err := storage.ResolveFilePath(path)
 	if err != nil {
 		return nil, err

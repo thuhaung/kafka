@@ -16,6 +16,7 @@ var (
 func (image *Image) applyChanges(record []byte) error {
 	decoder := protocol.NewDecoder(record)
 	recordType := decoder.ReadUint8()
+	payload := record[1:]
 
 	if err := decoder.GetError(); err != nil {
 		return err
@@ -24,28 +25,28 @@ func (image *Image) applyChanges(record []byte) error {
 	log.Printf("Applying record of type %d to image", recordType)
 
 	switch recordType {
-		case TopicCreationRecordType:
-			err := image.applyTopicCreation(record)
-			if err != nil {
-				return fmt.Errorf("%w: %v", ErrCannotApplyChange, err)
-			}
-		case PartitionCreationRecordType:
-			err := image.applyPartitionCreation(record)
-			if err != nil {
-				return fmt.Errorf("%w: %v", ErrCannotApplyChange, err)
-			}
-		case PartitionUpdateRecordType:
-			err := image.applyPartitionUpdate(record)
-			if err != nil {
-				return fmt.Errorf("%w: %v", ErrCannotApplyChange, err)
-			}
-		case BrokerRegistrationRecordType:
-			err := image.applyBrokerRegistration(record)
-			if err != nil {
-				return fmt.Errorf("%w: %v", ErrCannotApplyChange, err)
-			}
-		default:
-			return ErrUnknownRecordType
+	case TopicCreationRecordType:
+		err := image.applyTopicCreation(payload)
+		if err != nil {
+			return fmt.Errorf("%w: %v", ErrCannotApplyChange, err)
+		}
+	case PartitionCreationRecordType:
+		err := image.applyPartitionCreation(payload)
+		if err != nil {
+			return fmt.Errorf("%w: %v", ErrCannotApplyChange, err)
+		}
+	case PartitionUpdateRecordType:
+		err := image.applyPartitionUpdate(payload)
+		if err != nil {
+			return fmt.Errorf("%w: %v", ErrCannotApplyChange, err)
+		}
+	case BrokerRegistrationRecordType:
+		err := image.applyBrokerRegistration(payload)
+		if err != nil {
+			return fmt.Errorf("%w: %v", ErrCannotApplyChange, err)
+		}
+	default:
+		return ErrUnknownRecordType
 	}
 
 	return nil
@@ -59,7 +60,7 @@ func (image *Image) applyBrokerRegistration(record []byte) error {
 
 	if brokerRegistrationRecord.ClusterID != image.ClusterID {
 		return fmt.Errorf("Cluster ID mismatch: expected %s but got %s", image.ClusterID, brokerRegistrationRecord.ClusterID)
-		
+
 	}
 
 	image.Brokers[brokerRegistrationRecord.BrokerID] = brokerRegistrationRecord.toBrokerMetadata()

@@ -7,5 +7,5 @@ import (
 
 type Broker struct {
 	nodeConfig *config.NodeConfig
-	servers []*network.Server
+	servers    []*network.Server
 }

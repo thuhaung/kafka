@@ -1,3 +1,0 @@
-package broker
-
-func RegisterBrokerAndFetchMetadata()
