@@ -45,14 +45,15 @@ connection depends on the peer relationship.
 
 | Connection | Initiator | Listener | Purpose |
 | --- | --- | --- | --- |
-| broker-client | producer, consumer, topic CLI, admin CLI | broker `PLAINTEXT` listener | produce, fetch, topic operations, coordinator lookup, group APIs |
-| broker-broker | broker | peer broker `PLAINTEXT` listener | partition replication, follower fetch, broker metadata exchange |
-| broker-controller | broker | controller `CONTROLLER` listener | broker registration, metadata fetch, controller-directed broker requests |
-| controller-controller | controller | peer controller `CONTROLLER` listener | quorum metadata fetch, leader redirects, future Raft traffic |
+| broker-client | producer, consumer, topic CLI, admin CLI | broker configured listener alias mapped to `PLAINTEXT` | produce, fetch, topic operations, coordinator lookup, group APIs |
+| broker-broker | broker | peer broker configured listener alias mapped to `PLAINTEXT` | partition replication, follower fetch, broker metadata exchange |
+| broker-controller | broker | controller configured listener alias mapped to `PLAINTEXT` | broker registration, metadata fetch, controller-directed broker requests |
+| controller-controller | controller | peer controller configured listener alias mapped to `PLAINTEXT` | quorum metadata fetch, leader redirects, future Raft traffic |
 
-In this phase, `PLAINTEXT` and `CONTROLLER` are listener names, not security
-guarantees. Both carry unencrypted TCP traffic unless a later security design
-adds transport protection.
+In this phase, listener names are aliases chosen in configuration. The only
+supported security protocol is `PLAINTEXT`, and every configured listener alias
+must map to it. It carries unencrypted TCP traffic unless a later security
+design adds transport protection.
 
 ## TCP Behavior
 

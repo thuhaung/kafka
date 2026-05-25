@@ -61,13 +61,11 @@ source of truth for static node metadata.
 
 During the node's lifetime:
 
-- client-facing networking uses the `PLAINTEXT` listener metadata
-- broker-to-broker communication uses the `PLAINTEXT` listener metadata
+- client-facing networking uses the configured `PLAINTEXT` listener metadata
+- broker-to-broker communication uses the configured `PLAINTEXT` listener
+  metadata
 - broker-to-controller communication uses `LeaderController` when the node role
   is `broker` and discovery has completed
-- every node keeps both `PLAINTEXT` and `CONTROLLER` listener metadata in this
-  phase so the configuration shape stays stable as later phases allow broker
-  and controller responsibilities to move between nodes
 - local storage paths use `LogDir`
 - role checks use the `Role` field
 - leader-only partition work uses the broker-local leader partition state
@@ -129,8 +127,7 @@ The first-phase behavior is:
   by `config.path`
 - the broker picks a random controller endpoint from that quorum configuration
 - the broker sends `RegisterBrokerAndFetchMetadata` using `ClusterID`,
-  `NodeID`, and advertised listener metadata for both broker and controller
-  communication
+  `NodeID`, and its configured listener host and port
 - if the contacted controller is not the leader, it returns `NOT_LEADER`
   together with the actual leader node ID and leader address
 - the broker stores that returned endpoint in memory as `LeaderController`
@@ -199,7 +196,7 @@ conditions occur:
 - multiple configured roles in `process.roles`
 - unsupported listener name
 - duplicate listener type
-- missing required listener for the configured role
+- missing required listener
 - invalid or missing cluster ID
 - invalid `controller.quorum.voters` formatting
 - empty controller quorum for a broker-role or controller-role node
@@ -225,7 +222,7 @@ The broker configuration layer should explicitly handle:
 - multiple configured roles in `process.roles`
 - unsupported listener names
 - duplicate listener types
-- missing required listener for the configured role
+- missing required listener
 - invalid or missing cluster ID
 - invalid `controller.quorum.voters` formatting
 - empty controller quorum for a broker-role or controller-role node

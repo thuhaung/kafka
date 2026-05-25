@@ -14,28 +14,25 @@ import (
 )
 
 const (
-	propertyClusterID               = "cluster.id"
-	propertyProcessRoles            = "process.roles"
-	propertyNodeID                  = "node.id"
-	propertyListeners               = "listeners"
-	propertyAdvertisedListeners     = "advertised.listeners"
-	propertySecurityProtocolMap     = "listener.security.protocol.map"
-	propertyInterBrokerListenerName = "inter.broker.listener.name"
-	propertyControllerListenerNames = "controller.listener.names"
-	propertyControllerQuorumVoters  = "controller.quorum.voters"
-	propertyLogDirs                 = "log.dir"
-	propertyIsLeader                = "is.leader"
+	propertyClusterID              = "cluster.id"
+	propertyProcessRoles           = "process.roles"
+	propertyNodeID                 = "node.id"
+	propertyListeners              = "listeners"
+	propertySecurityProtocolMap    = "listener.security.protocol.map"
+	propertyControllerQuorumVoters = "controller.quorum.voters"
+	propertyLogDirs                = "log.dir"
+	propertyIsLeader               = "is.leader"
 )
 
 var (
-	ErrInvalidConfig           = errors.New("Invalid config")
-	ErrInvalidClusterID        = errors.New("Invalid " + propertyClusterID)
-	ErrInvalidLogDir           = errors.New("Invalid " + propertyLogDirs)
-	ErrInvalidListenerProtocol = errors.New("Invalid listener protocol. Only PLAINTEXT is supported for broker-client communication and CONTROLLER is supported for controller communication at the moment")
-	ErrInvalidRole             = errors.New("Invalid " + propertyProcessRoles)
-	ErrEmptyListeners          = errors.New("At least one listener must be configured")
-	ErrEmptyControllerQuorum     = errors.New("Controller quorum voters must be configured for controller role")
-	ErrInvalidNodeID 		   = errors.New("Invalid " + propertyNodeID)
+	ErrInvalidConfig              = errors.New("Invalid config")
+	ErrInvalidClusterID           = errors.New("Invalid " + propertyClusterID)
+	ErrInvalidLogDir              = errors.New("Invalid " + propertyLogDirs)
+	ErrInvalidListenerProtocol    = errors.New("Invalid listener protocol. Only PLAINTEXT is supported at the moment")
+	ErrInvalidRole                = errors.New("Invalid " + propertyProcessRoles)
+	ErrEmptyListeners             = errors.New("Exactly one listener must be configured")
+	ErrEmptyControllerQuorum      = errors.New("Controller quorum voters must be configured for controller role")
+	ErrInvalidNodeID              = errors.New("Invalid " + propertyNodeID)
 	ErrControllerNotFoundInQuorum = errors.New("Controller node ID must be included in controller quorum voters")
 )
 
@@ -69,26 +66,23 @@ func parseProperties(path string) (map[string]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidConfig, err)
 	}
-
 	defer file.Close()
 
 	properties := make(map[string]string)
-
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		line := scanner.Text()
-		if len(line) == 0 || line == "" {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
 			continue
 		}
 
 		parts := strings.SplitN(line, "=", 2)
 		if len(parts) != 2 {
-			return nil, fmt.Errorf("%w: %v", ErrInvalidConfig, err)
+			return nil, fmt.Errorf("%w: malformed property line %q", ErrInvalidConfig, line)
 		}
 
 		key := strings.TrimSpace(parts[0])
 		value := strings.TrimSpace(parts[1])
-
 		properties[key] = value
 	}
 
@@ -101,7 +95,8 @@ func parseProperties(path string) (map[string]string, error) {
 
 func buildNodeConfig(properties map[string]string) (*NodeConfig, error) {
 	config := &NodeConfig{
-		SecurityProtocol: PlaintextProtocol,
+		SecurityProtocol:         PlaintextProtocol,
+		ListenerSecurityProtocol: make(map[string]SecurityProtocol),
 	}
 
 	for key, value := range properties {
@@ -121,7 +116,7 @@ func buildNodeConfig(properties map[string]string) (*NodeConfig, error) {
 			}
 			config.IsLeader = isLeader
 		case propertyNodeID:
-			nodeID, err := strconv.Atoi(value)
+			nodeID, err := parseNodeID(value)
 			if err != nil {
 				return nil, err
 			}
@@ -131,31 +126,16 @@ func buildNodeConfig(properties map[string]string) (*NodeConfig, error) {
 			if err != nil {
 				return nil, err
 			}
+			if len(listeners) != 1 {
+				return nil, ErrEmptyListeners
+			}
 			config.ListenerConfigs = listeners
-		case propertyAdvertisedListeners:
-			listeners, err := parseListeners(value)
-			if err != nil {
-				return nil, err
-			}
-			config.AdvertisedListeners = listeners
 		case propertySecurityProtocolMap:
-			protocol, err := parseSecurityProtocolMap(value)
+			protocolMap, err := parseSecurityProtocolMap(value)
 			if err != nil {
 				return nil, err
 			}
-			config.SecurityProtocol = protocol
-		case propertyInterBrokerListenerName:
-			listenerType, err := parseListenerType(value)
-			if err != nil {
-				return nil, err
-			}
-			config.InterBrokerListener = listenerType
-		case propertyControllerListenerNames:
-			listenerType, err := parseListenerType(value)
-			if err != nil {
-				return nil, err
-			}
-			config.ControllerListener = listenerType
+			config.ListenerSecurityProtocol = protocolMap
 		case propertyControllerQuorumVoters:
 			quorum, err := parseControllerQuorum(value)
 			if err != nil {
@@ -170,9 +150,16 @@ func buildNodeConfig(properties map[string]string) (*NodeConfig, error) {
 	return config, nil
 }
 
+func parseNodeID(value string) (int, error) {
+	nodeID, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil {
+		return 0, fmt.Errorf("%w: %v", ErrInvalidNodeID, err)
+	}
+	return nodeID, nil
+}
+
 func parseIsLeader(value string) (bool, error) {
-	trimmed := strings.TrimSpace(value)
-	switch trimmed {
+	switch strings.TrimSpace(value) {
 	case "true", "True", "TRUE":
 		return true, nil
 	case "false", "False", "FALSE":
@@ -192,20 +179,9 @@ func parseRole(value string) (Role, error) {
 	}
 }
 
-func parseListenerType(value string) (ListenerType, error) {
-	listenerType := ListenerType(strings.TrimSpace(value))
-	switch listenerType {
-	case PlaintextListener, ControllerListener:
-		return listenerType, nil
-	default:
-		return "", fmt.Errorf("%w: unsupported listener type %q", ErrInvalidConfig, value)
-	}
-}
-
 func parseListeners(value string) ([]ListenerConfig, error) {
 	parts := splitCSV(value)
 	listeners := make([]ListenerConfig, 0, len(parts))
-
 	for _, part := range parts {
 		listener, err := parseListener(part)
 		if err != nil {
@@ -213,7 +189,6 @@ func parseListeners(value string) ([]ListenerConfig, error) {
 		}
 		listeners = append(listeners, listener)
 	}
-
 	return listeners, nil
 }
 
@@ -223,9 +198,9 @@ func parseListener(value string) (ListenerConfig, error) {
 		return ListenerConfig{}, fmt.Errorf("%w: invalid listener %q", ErrInvalidConfig, value)
 	}
 
-	listenerType, err := parseListenerType(parts[0])
-	if err != nil {
-		return ListenerConfig{}, err
+	listenerType := strings.TrimSpace(parts[0])
+	if listenerType == "" {
+		return ListenerConfig{}, fmt.Errorf("%w: invalid listener alias %q", ErrInvalidConfig, value)
 	}
 
 	host, port, err := net.SplitHostPort(parts[1])
@@ -248,7 +223,6 @@ func parseListener(value string) (ListenerConfig, error) {
 func parseControllerQuorum(value string) ([]ControllerEndpoint, error) {
 	parts := splitCSV(value)
 	quorum := make([]ControllerEndpoint, 0, len(parts))
-
 	for _, part := range parts {
 		endpoint, err := parseControllerEndpoint(part)
 		if err != nil {
@@ -256,7 +230,6 @@ func parseControllerQuorum(value string) ([]ControllerEndpoint, error) {
 		}
 		quorum = append(quorum, endpoint)
 	}
-
 	return quorum, nil
 }
 
@@ -288,26 +261,38 @@ func parseControllerEndpoint(value string) (ControllerEndpoint, error) {
 	}, nil
 }
 
-func parseSecurityProtocolMap(value string) (SecurityProtocol, error) {
+func parseSecurityProtocolMap(value string) (map[string]SecurityProtocol, error) {
 	parts := splitCSV(value)
+	if len(parts) == 0 {
+		return nil, fmt.Errorf("%w: empty security protocol map", ErrInvalidConfig)
+	}
+
+	protocols := make(map[string]SecurityProtocol, len(parts))
 	for _, part := range parts {
 		mapping := strings.SplitN(strings.TrimSpace(part), ":", 2)
 		if len(mapping) != 2 {
-			return "", fmt.Errorf("%w: invalid security protocol mapping %q", ErrInvalidConfig, part)
+			return nil, fmt.Errorf("%w: invalid security protocol mapping %q", ErrInvalidConfig, part)
 		}
 
-		if strings.TrimSpace(mapping[1]) != string(PlaintextProtocol) {
-			return "", fmt.Errorf("%w: unsupported security protocol %q", ErrInvalidConfig, mapping[1])
+		listenerAlias := strings.TrimSpace(mapping[0])
+		if listenerAlias == "" {
+			return nil, fmt.Errorf("%w: invalid listener alias in security protocol map %q", ErrInvalidConfig, part)
 		}
+
+		protocol := SecurityProtocol(strings.TrimSpace(mapping[1]))
+		if protocol != PlaintextProtocol {
+			return nil, fmt.Errorf("%w: unsupported security protocol %q", ErrInvalidConfig, mapping[1])
+		}
+
+		protocols[listenerAlias] = protocol
 	}
 
-	return PlaintextProtocol, nil
+	return protocols, nil
 }
 
 func splitCSV(value string) []string {
 	rawParts := strings.Split(value, ",")
 	parts := make([]string, 0, len(rawParts))
-
 	for _, part := range rawParts {
 		trimmed := strings.TrimSpace(part)
 		if trimmed == "" {
@@ -315,7 +300,6 @@ func splitCSV(value string) []string {
 		}
 		parts = append(parts, trimmed)
 	}
-
 	return parts
 }
 
@@ -326,16 +310,14 @@ func validateConfig(config *NodeConfig) error {
 
 	if config.LogDir == "" {
 		return ErrInvalidLogDir
-	} else {
-		if _, err := storage.CheckFolderExists(config.LogDir); err != nil {
-			return fmt.Errorf("%w: %v", ErrInvalidLogDir, err)
-		}
+	}
+	if _, err := storage.CheckFolderExists(config.LogDir); err != nil {
+		return fmt.Errorf("%w: %v", ErrInvalidLogDir, err)
 	}
 
 	if config.Role == "" {
 		return ErrInvalidRole
 	}
-
 	if config.Role == RoleBroker && config.IsLeader {
 		return ErrInvalidRole
 	}
@@ -346,41 +328,48 @@ func validateConfig(config *NodeConfig) error {
 
 	if len(config.ControllerQuorum) == 0 {
 		return ErrEmptyControllerQuorum
-	} else {
-		if config.Role == RoleController {
-			for _, endpoint := range config.ControllerQuorum {
-				if endpoint.NodeID < 0 {
-					return ErrInvalidNodeID
-				}
-				if endpoint.NodeID == config.NodeID {
-					break
-				}
+	}
+
+	if config.Role == RoleController {
+		foundNode := false
+		for _, endpoint := range config.ControllerQuorum {
+			if endpoint.NodeID < 0 {
+				return ErrInvalidNodeID
 			}
+			if endpoint.NodeID == config.NodeID {
+				foundNode = true
+			}
+		}
+		if !foundNode {
 			return ErrControllerNotFoundInQuorum
 		}
 	}
 
-	if config.InterBrokerListener != PlaintextListener || config.ControllerListener != ControllerListener {
-		return ErrInvalidListenerProtocol
+	if len(config.ListenerConfigs) != 1 {
+		return ErrEmptyListeners
 	}
 
-	if len(config.ListenerConfigs) == 0 {
+	listener := config.ListenerConfigs[0]
+	if listener.Type == "" {
 		return ErrEmptyListeners
-	} else {
-		for _, listener := range config.ListenerConfigs {
-			if listener.Type != PlaintextListener && listener.Type != ControllerListener {
-				return ErrInvalidListenerProtocol
-			}
-		}
 	}
+	if listener.Host == "" || listener.Port <= 0 {
+		return fmt.Errorf("%w: listener host and port must be set", ErrInvalidConfig)
+	}
+
+	protocol, ok := config.ListenerSecurityProtocol[listener.Type]
+	if !ok {
+		return fmt.Errorf("%w: missing security protocol mapping for listener alias %q", ErrInvalidConfig, listener.Type)
+	}
+	if protocol != PlaintextProtocol {
+		return ErrInvalidListenerProtocol
+	}
+	config.SecurityProtocol = protocol
 
 	return nil
 }
 
 func resolveConfig(config *NodeConfig) {
-	if len(config.AdvertisedListeners) == 0 {
-		config.AdvertisedListeners = config.ListenerConfigs
-	}
 	if config.IsLeader {
 		for _, endpoint := range config.ControllerQuorum {
 			if endpoint.NodeID == config.NodeID {
@@ -392,6 +381,5 @@ func resolveConfig(config *NodeConfig) {
 				break
 			}
 		}
-
 	}
 }

@@ -49,6 +49,12 @@ to open the cluster metadata log before it can replay topic metadata, accept
 broker registrations, or process topic creation requests. Because of that, this
 topic is not created by appending an ordinary `TopicCreationRecord` to itself.
 
+Although this document uses the topic-style name `__cluster_metadata`, the
+first-phase implementation should treat it as a special internal metadata log
+rather than a normal user topic. It has exactly one logical partition for the
+whole cluster metadata history, and every controller stores its own local
+replica of that same partition on disk.
+
 The initial implementation should treat `__cluster_metadata` as a bootstrap
 descriptor persisted with controller-local configuration:
 
@@ -68,19 +74,21 @@ Recommended first-phase descriptor:
 | Field | Value |
 | --- | --- |
 | Name | `__cluster_metadata` |
-| Partitions | `1` |
-| Partition IDs | `0` only |
+| Partitions | Exactly one logical metadata partition |
+| Partition IDs | `0` only when reusing the partition directory layout |
 | Replication model | Controller quorum replication, not normal broker topic replication |
 | Retention | Unlimited until metadata snapshots or compaction are designed |
 | Compaction | Disabled in the first phase |
 | Placement | Controller `metadata.log.dir` |
 
-Partitioning is intentionally fixed to one partition in this phase. Cluster
-metadata changes must be totally ordered, and a single `__cluster_metadata-0`
-log gives the controller quorum one authoritative sequence of topic, partition,
-and broker records. Later Raft work may replace the static leader model, but it
-should preserve the single logical metadata log unless a separate design
-introduces metadata sharding.
+Cluster metadata changes must be totally ordered, so the first phase fixes the
+metadata log to one logical partition. Reusing the existing log/partition
+directory structure as `__cluster_metadata-0` is acceptable and matches Kafka's
+on-disk shape, but that directory should be understood as the local storage
+representation of the single metadata-partition replica, not as evidence that
+`__cluster_metadata` behaves like a normal multi-partition topic. Later Raft
+work may replace the static leader model, but it should preserve one logical
+metadata log unless a separate design introduces metadata sharding.
 
 The in-memory metadata image may expose `__cluster_metadata` as an internal
 topic so broker and diagnostic reads can see that it exists. That exposure

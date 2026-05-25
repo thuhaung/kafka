@@ -7,13 +7,6 @@ const (
 	RoleController Role = "controller"
 )
 
-type ListenerType string
-
-const (
-	PlaintextListener  ListenerType = "PLAINTEXT"
-	ControllerListener ListenerType = "CONTROLLER"
-)
-
 type SecurityProtocol string
 
 const (
@@ -21,7 +14,7 @@ const (
 )
 
 type ListenerConfig struct {
-	Type ListenerType
+	Type string
 	Host string
 	Port int
 }
@@ -33,16 +26,14 @@ type ControllerEndpoint struct {
 }
 
 type NodeConfig struct {
-	ClusterID           string
-	NodeID              int
-	Role                Role
-	IsLeader			bool
-	LogDir              string
-	ListenerConfigs     []ListenerConfig
-	ControllerQuorum    []ControllerEndpoint
-	LeaderController    *ControllerEndpoint
-	SecurityProtocol    SecurityProtocol
-	AdvertisedListeners []ListenerConfig
-	InterBrokerListener ListenerType
-	ControllerListener  ListenerType
+	ClusterID                string
+	NodeID                   int
+	Role                     Role
+	IsLeader                 bool
+	LogDir                   string
+	ListenerConfigs          []ListenerConfig
+	ControllerQuorum         []ControllerEndpoint
+	LeaderController         *ControllerEndpoint
+	SecurityProtocol         SecurityProtocol
+	ListenerSecurityProtocol map[string]SecurityProtocol
 }

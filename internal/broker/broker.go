@@ -34,7 +34,7 @@ func Run(ctx context.Context, opts Options) error {
 	var wg sync.WaitGroup
 
 	for i, listener := range nodeConfig.ListenerConfigs {
-		log.Printf("Starting listener on %s:%d", listener.Host, listener.Port)
+		log.Printf("Starting listener %s on %s:%d", listener.Type, listener.Host, listener.Port)
 		addr := fmt.Sprintf("%s:%d", listener.Host, listener.Port)
 		wg.Add(1)
 

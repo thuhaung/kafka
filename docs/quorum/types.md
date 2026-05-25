@@ -22,9 +22,8 @@ Controller-specific additions are:
 
 Controller nodes must still satisfy the shared listener constraints from
 [broker.md](../broker/broker.md). In addition, a controller process must run
-with exactly the `controller` role and should keep both `PLAINTEXT` and
-`CONTROLLER` listeners configured so the node metadata shape stays compatible
-with later role movement.
+with exactly the `controller` role and should keep the shared single
+listener-plus-protocol-map configuration used in this phase.
 
 ## Server Start CLI and Properties Format
 
@@ -49,11 +48,8 @@ Example:
 cluster.id=4f3e7f6e-7c46-4f9f-b0db-2dcf6d3c6c14
 process.roles=controller
 node.id=1
-listeners=PLAINTEXT://localhost:9092,CONTROLLER://localhost:9093
-advertised.listeners=PLAINTEXT://localhost:9092,CONTROLLER://localhost:9093
-listener.security.protocol.map=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-inter.broker.listener.name=PLAINTEXT
-controller.listener.names=CONTROLLER
+listeners=CONTROLLER://localhost:9093
+listener.security.protocol.map=CONTROLLER:PLAINTEXT
 controller.quorum.voters=1@localhost:9093,2@localhost:9094,3@localhost:9095
 is.leader=true
 metadata.log.dir=kraft-cluster/controller1/metadata-log
@@ -64,8 +60,8 @@ log.dir=kraft-cluster/controller1
 
 The initial implementation should reuse the common property mapping from
 [broker.md](../broker/broker.md) for `cluster.id`, `process.roles`, `node.id`,
-`listeners`, `listener.security.protocol.map`, `inter.broker.listener.name`,
-`controller.listener.names`, `controller.quorum.voters`, and `log.dir`.
+`listeners`, `listener.security.protocol.map`, `controller.quorum.voters`, and
+`log.dir`.
 
 Controller-specific properties are:
 
@@ -96,16 +92,24 @@ This path points to the location of the controller metadata log, which stores
 cluster metadata such as topic state and other control-plane records defined
 later.
 
-### Advertised Listeners and Quorum Voters
+In this phase, that metadata log should be treated as one logical cluster
+metadata partition replicated across the controller quorum. Each controller
+keeps its own local on-disk replica under `MetadataLogDir`; controllers do not
+share one filesystem path.
 
-`advertised.listeners` contains the cluster-reachable addresses other clients,
-brokers, and controllers use to connect to this node. In this phase it may
-include both `PLAINTEXT` and `CONTROLLER` listeners.
+### Listener and Quorum Voters
+
+The configured `listeners` entry is also the cluster-reachable advertised
+address other clients, brokers, and controllers use to connect to this node in
+this phase.
+
+The configured listener alias must resolve to `PLAINTEXT` through
+`listener.security.protocol.map`.
 
 `controller.quorum.voters` is the controller bootstrap map keyed by controller
-node ID. Its host and port values should match the advertised `CONTROLLER`
-listener for each controller node so startup discovery and redirect responses
-use the same reachable controller address.
+node ID. Its host and port values should match each controller node's configured
+listener so startup discovery and redirect responses use the same reachable
+controller address.
 
 ## Proposed Go Types
 
@@ -125,11 +129,10 @@ type NodeConfig struct {
 	NodeID             int
 	Role               Role
 	LogDir             string
-	ListenerConfigs    []ListenerConfig
+	ListenerConfig     ListenerConfig
 	ControllerQuorum   []ControllerEndpoint
 	LeaderController   *ControllerEndpoint
 	SecurityProtocol   string
-	ControllerListener ListenerType
 
 	// Controller-specific fields.
 	MetadataLogDir     string
@@ -157,7 +160,8 @@ source of truth for static controller metadata.
 
 During the node's lifetime:
 
-- broker-to-controller communication uses the `CONTROLLER` listener metadata
+- broker-to-controller communication uses the shared configured listener
+  metadata
 - controller-local metadata-log access uses `MetadataLogDir`
 - any controller-local auxiliary storage uses `LogDir`
 - leader checks use the `IsLeaderController` field
@@ -212,3 +216,8 @@ The leader controller is the only controller that should accept new metadata
 state changes in this phase. Non-leader controllers maintain local images from
 metadata fetched from the leader, but they should not publish uncommitted local
 decisions as cluster metadata.
+
+More concretely, every controller stores the same committed metadata-partition
+history in its own local metadata-log directory, modulo temporary follower lag.
+That shared committed record order is what allows each controller to rebuild
+the same metadata image independently from local storage.

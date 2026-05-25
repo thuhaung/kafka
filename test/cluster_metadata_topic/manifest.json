@@ -1,0 +1,40 @@
+[
+  {
+    "offset": 0,
+    "recordTypeConst": "RecordTypeBrokerRegistration",
+    "type": "BrokerRegistrationRecord",
+    "typeId": 4,
+    "clusterId": "4f3e7f6e-7c46-4f9f-b0db-2dcf6d3c6c14",
+    "brokerId": 1,
+    "host": "localhost",
+    "port": 9092,
+    "logDir": "kraft-cluster/node1",
+    "registeredAtUnixMs": 1710000000000
+  },
+  {
+    "offset": 1,
+    "recordTypeConst": "RecordTypeTopicCreation",
+    "type": "TopicCreationRecord",
+    "typeId": 1,
+    "name": "orders",
+    "config": {
+      "partitions": 1,
+      "replicationFactor": 1,
+      "retentionMs": 604800000,
+      "retentionBytes": 1073741824,
+      "minInSyncReplicas": 1
+    },
+    "createdAtUnixMs": 1710000001000
+  },
+  {
+    "offset": 2,
+    "recordTypeConst": "RecordTypePartitionCreation",
+    "type": "PartitionCreationRecord",
+    "typeId": 2,
+    "topicName": "orders",
+    "partitionId": 0,
+    "leaderBrokerId": 1,
+    "replicaBrokerIds": [1],
+    "createdAtUnixMs": 1710000002000
+  }
+]

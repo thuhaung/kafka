@@ -63,13 +63,11 @@ Recommended Go shape:
 
 ```go
 type RegisterBrokerAndFetchMetadataRequest struct {
-	ClusterID      string
-	BrokerID       int32
-	Host           string
-	Port           int32
-	ControllerHost string
-	ControllerPort int32
-	LogDir         string
+	ClusterID string
+	BrokerID  int32
+	Host      string
+	Port      int32
+	LogDir    string
 }
 ```
 
@@ -79,10 +77,8 @@ Field meanings:
 | --- | --- | --- | --- |
 | ClusterID | string | Yes | Cluster identifier from the broker's properties file |
 | BrokerID | int32 | Yes | Broker node ID from the broker's properties file |
-| Host | string | Yes | Advertised broker host for client and broker traffic |
-| Port | int32 | Yes | Advertised broker port for client and broker traffic |
-| ControllerHost | string | No | Broker controller-listener host when different from `Host` |
-| ControllerPort | int32 | No | Broker controller-listener port when different from `Port` |
+| Host | string | Yes | Broker host used for client, broker, and controller traffic in this phase |
+| Port | int32 | Yes | Broker port used for client, broker, and controller traffic in this phase |
 | LogDir | string | No | Broker-local log directory from node configuration |
 
 Validation rules:
@@ -91,8 +87,6 @@ Validation rules:
 - `BrokerID` must be greater than or equal to zero.
 - `Host` must be non-empty.
 - `Port` must be greater than zero.
-- `ControllerPort`, if set, must be greater than zero.
-- `ControllerHost` may be empty only when `ControllerPort` is also empty.
 - The leader controller must look up the current in-memory metadata image by
   `ClusterID`.
 - The image for `ClusterID` must exist before the broker can be registered. A
@@ -102,8 +96,8 @@ Validation rules:
 - If the image does not contain `BrokerID`, the leader controller may append a
   new broker registration record.
 - If the image already contains `BrokerID`, the stored broker metadata must
-  match `Host`, `Port`, `ControllerHost`, `ControllerPort`, and `LogDir` from
-  the request for the operation to be treated as a restart.
+  match `Host`, `Port`, and `LogDir` from the request for the operation to be
+  treated as a restart.
 
 ## Response Schema
 

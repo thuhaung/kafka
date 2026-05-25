@@ -13,7 +13,8 @@ The startup loader should reuse the shared node validation rules from
 - `process.roles` must be exactly `controller`.
 - `is.leader` must parse as a boolean.
 - `metadata.log.dir` must be present and non-empty.
-- Both configured `PLAINTEXT` and `CONTROLLER` listeners must be present.
+- Exactly one configured listener alias must be present.
+- `listener.security.protocol.map` must map that alias to `PLAINTEXT`.
 - The loaded or fetched metadata image must match `ClusterID`.
 - A controller must parse `controller.quorum.voters`, even when it is currently
   configured as the leader controller.
@@ -35,7 +36,7 @@ The controller configuration layer should explicitly handle:
 - unreadable properties file at `config.path`
 - malformed property lines
 - non-controller role configured for the controller process
-- missing required `CONTROLLER` listener
+- missing required listener
 - invalid `is.leader` formatting
 - missing or invalid `metadata.log.dir`
 - a contacted non-leader controller returning `LEADER_UNKNOWN`
@@ -84,7 +85,7 @@ The controller startup implementation should include public API tests covering:
 - rejection of `process.roles=broker,controller`
 - rejection of invalid `is.leader` format
 - rejection of missing `metadata.log.dir`
-- rejection of missing required `CONTROLLER` listener
+- rejection of missing required listener
 - verification that non-leader controller startup attempts `FetchMetadataImage`
   after config load
 - verification that non-leader startup discovery chooses a random controller

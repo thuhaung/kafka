@@ -1,11 +1,8 @@
 cluster.id=4f3e7f6e-7c46-4f9f-b0db-2dcf6d3c6c14
 process.roles=broker
 node.id=1
-is.leader=true
-listeners=PLAINTEXT://localhost:9092
-advertised.listeners=PLAINTEXT://localhost:9092
-listener.security.protocol.map=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-inter.broker.listener.name=PLAINTEXT
-controller.listener.names=CONTROLLER
+is.leader=false
+listeners=BROKER://localhost:9092
+listener.security.protocol.map=BROKER:PLAINTEXT
 controller.quorum.voters=1@localhost:9093,2@localhost:9094,3@localhost:9095
 log.dir=kraft-cluster/node1

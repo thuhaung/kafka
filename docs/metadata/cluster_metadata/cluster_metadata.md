@@ -52,7 +52,14 @@ construct a read-only metadata image from committed metadata-log records.
 ## Relationship to the Cluster Metadata Log
 
 The metadata image is derived from records stored in the internal
-`__cluster_metadata` topic.
+`__cluster_metadata` metadata log.
+
+In this phase, `__cluster_metadata` should be treated as a special internal log
+with exactly one logical partition for the whole cluster metadata history. The
+implementation may still reuse the existing partition directory convention on
+disk as `__cluster_metadata-0`, but that path represents one controller's local
+replica of the single metadata partition rather than a normal user-topic
+partition.
 
 The log's record types are defined in
 [types.md](../cluster_metadata_log/types.md):
@@ -71,7 +78,8 @@ the image once registration records have been replayed.
 Replay rules:
 
 1. Start from an empty metadata image.
-2. Read committed metadata-log records in increasing offset order.
+2. Read committed metadata-log records from the local replica of the metadata
+   partition in increasing offset order.
 3. Validate each record against the current image.
 4. Apply the record to produce the next image state.
 5. Reject or stop replay on records that cannot be safely interpreted.
@@ -156,10 +164,8 @@ Fields:
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `BrokerID` | int32 | Yes | Unique broker node ID |
-| `Host` | string | Yes | Advertised broker host for client and broker traffic |
-| `Port` | int32 | Yes | Advertised broker port for client and broker traffic |
-| `ControllerHost` | string | No | Host for broker-controller traffic when different from `Host` |
-| `ControllerPort` | int32 | No | Port for broker-controller traffic when different from `Port` |
+| `Host` | string | Yes | Broker host used for client, broker, and controller traffic in this phase |
+| `Port` | int32 | Yes | Broker port used for client, broker, and controller traffic in this phase |
 | `LogDir` | string | No | Broker-local log directory from node configuration |
 | `RegisteredAt` | timestamp | No | Time the broker metadata entry was created |
 | `UpdatedAt` | timestamp | No | Time the broker metadata entry was last updated |
@@ -271,6 +277,11 @@ Broker startup should construct metadata in this order:
 
 If replay fails, the broker must not serve requests using a partial image unless
 the failure mode is explicitly handled by a later recovery design.
+
+Controller startup follows the same image-building rule, but the controller is
+the owner of the authoritative metadata log replica. Each controller rebuilds
+its in-memory image from its own local copy of the single metadata partition
+and then catches up through replication if it is behind the leader.
 
 ## Testing Strategy
 

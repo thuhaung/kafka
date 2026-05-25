@@ -187,7 +187,7 @@ these conditions occur:
 - malformed property lines
 - non-controller role configured for the controller process
 - multiple configured roles in `process.roles`
-- missing required `CONTROLLER` listener
+- missing required listener
 - invalid cluster ID
 - invalid `controller.quorum.voters` formatting
 - empty controller quorum
@@ -236,7 +236,7 @@ controller quorum and fetch the current metadata image for its `ClusterID`.
 The recommended flow is:
 
 1. The broker loads its local `NodeConfig`, including `ClusterID`, `NodeID`,
-   advertised broker listener, controller listener, and controller quorum.
+   its configured listener, and controller quorum.
 2. The broker chooses a controller endpoint from `ControllerQuorum`.
 3. The broker sends a startup metadata request that includes its cluster ID,
    broker ID, and broker contact metadata.

@@ -14,16 +14,12 @@ The broker loader and startup path must enforce:
 - `cluster.id` is present and parses as a UUID.
 - `process.roles` contains exactly one supported role.
 - `listeners` defines only supported listener types.
-- `listeners` contains at most one `PLAINTEXT` listener.
-- `listeners` contains at most one `CONTROLLER` listener.
-- `listener.security.protocol.map` resolves configured listener types to
-  `PLAINTEXT`.
-- `inter.broker.listener.name` is `PLAINTEXT`.
-- `controller.listener.names` is `CONTROLLER`.
+- `listeners` contains exactly one listener alias.
+- `listener.security.protocol.map` contains an entry for that alias.
+- the configured listener alias resolves to `PLAINTEXT`.
 - `controller.quorum.voters` parses into one or more controller endpoints for
   broker and controller nodes.
 - `log.dir` resolves to exactly one local directory in this phase.
-- Every node configures both `PLAINTEXT` and `CONTROLLER` listeners.
 
 ## Failure Modes
 
@@ -39,7 +35,7 @@ The broker implementation should explicitly handle:
 - multiple configured roles in `process.roles`
 - unsupported listener names
 - duplicate listener types
-- missing required listener for the configured role
+- missing required listener
 - invalid or missing cluster ID
 - invalid `controller.quorum.voters` formatting
 - empty controller quorum for a broker-role node

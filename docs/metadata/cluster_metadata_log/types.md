@@ -197,10 +197,8 @@ Payload fields:
 | --- | --- | --- | --- |
 | `ClusterID` | string | Yes | Cluster identifier the broker is joining |
 | `BrokerID` | int32 | Yes | Unique broker node ID |
-| `Host` | string | Yes | Advertised broker host for client and broker traffic |
-| `Port` | int32 | Yes | Advertised broker port for client and broker traffic |
-| `ControllerHost` | string | No | Host for broker-controller traffic when different from `Host` |
-| `ControllerPort` | int32 | No | Port for broker-controller traffic when different from `Port` |
+| `Host` | string | Yes | Broker host used for client, broker, and controller traffic in this phase |
+| `Port` | int32 | Yes | Broker port used for client, broker, and controller traffic in this phase |
 | `LogDir` | string | No | Broker-local log directory from node configuration |
 | `RegisteredAt` | timestamp | Yes | Time this registration was accepted by the leader controller |
 
@@ -211,8 +209,6 @@ Validation rules:
 - `BrokerID` must be greater than or equal to zero
 - `Host` must be non-empty
 - `Port` must be greater than zero
-- `ControllerPort`, if set, must be greater than zero
-- `ControllerHost` may be empty only when `ControllerPort` is also empty
 - `RegisteredAt` must be set
 - If the broker ID does not exist in the image, the record creates it
 - If the broker ID already exists in the image, replaying another
@@ -227,12 +223,9 @@ Recommended `Data` layout:
 4. Host length: 4 bytes
 5. Host bytes: variable length
 6. Port: 4 bytes
-7. ControllerHost length: 4 bytes
-8. ControllerHost bytes: variable length
-9. ControllerPort: 4 bytes
-10. LogDir length: 4 bytes
-11. LogDir bytes: variable length
-12. RegisteredAt: 8 bytes
+7. LogDir length: 4 bytes
+8. LogDir bytes: variable length
+9. RegisteredAt: 8 bytes
 
 `RegisteredAt` should be encoded as Unix time in milliseconds since epoch.
 

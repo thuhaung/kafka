@@ -53,14 +53,12 @@ type PartitionMetadata struct {
 }
 
 type BrokerMetadata struct {
-	BrokerID       int32
-	Host           string
-	Port           int32
-	ControllerHost string
-	ControllerPort int32
-	LogDir         string
-	RegisteredAt   time.Time
-	UpdatedAt      time.Time
+	BrokerID     int32
+	Host         string
+	Port         int32
+	LogDir       string
+	RegisteredAt time.Time
+	UpdatedAt    time.Time
 }
 ```
 
@@ -75,6 +73,6 @@ Implementation notes:
   image. It starts at `-1` for an empty image and advances only after a metadata
   record is successfully validated and applied. Consumers can use it to tell how
   fresh an image is relative to the log.
-- If `ControllerHost` or `ControllerPort` is unset, callers may use `Host` and
-  `Port` for controller-facing communication only when the broker/controller
-  design allows that listener fallback
+- `BrokerMetadata.Host` and `BrokerMetadata.Port` are the only broker endpoint
+  fields in this phase. The configured listener is also the advertised listener
+  for client, broker, and controller communication.

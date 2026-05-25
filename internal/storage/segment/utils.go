@@ -3,12 +3,25 @@ package segment
 import (
 	"fmt"
 	"os"
+	"log"
 	"path/filepath"
 	"time"
 
 	"github.com/thuhaung/kafka/internal/protocol"
 	"github.com/thuhaung/kafka/internal/storage"
 )
+
+const (
+	OffsetFieldSize = 8
+	LengthFieldSize = 4
+
+	HeaderSize = OffsetFieldSize + LengthFieldSize
+)
+
+type RecordHeader struct {
+	Offset int64
+	Length int32
+}
 
 func getFileName(baseOffset int64, extension string) string {
 	return fmt.Sprintf("%d.%s", baseOffset, extension)
@@ -18,23 +31,26 @@ func getPartitionPath(segment Segment) string {
 	return fmt.Sprintf("%s/%s-%d", segment.LogDir, segment.TopicName, segment.BaseOffset)
 }
 
-func createLog(segment Segment) (*os.File, error) {
-	path := getLogPath(segment)
+func (s *Segment) createLog() (*os.File, error) {
+	path := s.getLogPath()
+	log.Printf("Creating log file for segment at path: %s", path)
 	return storage.CreateFile(path)
 }
 
-func createIndex(segment Segment) (*os.File, error) {
-	path := getIndexPath(segment)
+func (s *Segment) createIndex() (*os.File, error) {
+	path := s.getIndexPath()
+	log.Printf("Creating index file for segment at path: %s", path)
 	return storage.CreateFile(path)
 }
 
-func createTimeIndex(segment Segment) (*os.File, error) {
-	path := getTimeIndexPath(segment)
+func (s *Segment) createTimeIndex() (*os.File, error) {
+	path := s.getTimeIndexPath()
+	log.Printf("Creating time index file for segment at path: %s", path)
 	return storage.CreateFile(path)
 }
 
-func getNextBytePosition(segment Segment) (int64, error) {
-	path := getLogPath(segment)
+func (s *Segment) getNextBytePosition() (int64, error) {
+	path := s.getLogPath()
 
 	info, err := storage.GetFileInfo(path)
 	if err != nil {
@@ -44,8 +60,9 @@ func getNextBytePosition(segment Segment) (int64, error) {
 	return info.Size(), nil
 }
 
-func appendLog(segment Segment, offset int64, record []byte) error {
-	path := getLogPath(segment)
+func (s *Segment) appendLog(offset int64, record []byte) error {
+	path := s.getLogPath()
+	log.Printf("Appending log entry for offset %d to segment at path: %s", offset, path)
 
 	encoder := protocol.NewEncoder()
 	encoder.WriteInt64(offset)
@@ -60,8 +77,9 @@ func appendLog(segment Segment, offset int64, record []byte) error {
 	return storage.AppendToFile(path, entry)
 }
 
-func appendIndex(segment Segment, offset int64, position int64) error {
-	path := getIndexPath(segment)
+func (s *Segment) appendIndex(offset int64, position int64) error {
+	path := s.getIndexPath()
+	log.Printf("Appending index entry for offset %d to segment at path: %s", offset, path)
 
 	encoder := protocol.NewEncoder()
 	encoder.WriteInt64(offset)
@@ -75,8 +93,9 @@ func appendIndex(segment Segment, offset int64, position int64) error {
 	return storage.AppendToFile(path, entry)
 }
 
-func appendTimeIndex(segment Segment, timestamp int64, offset int64) error {
-	path := getTimeIndexPath(segment)
+func (s *Segment) appendTimeIndex(timestamp int64, offset int64) error {
+	path := s.getTimeIndexPath()
+	log.Printf("Appending time index entry for timestamp %d and offset %d to segment at path: %s", timestamp, offset, path)
 
 	encoder := protocol.NewEncoder()
 	encoder.WriteInt64(timestamp)
@@ -90,20 +109,20 @@ func appendTimeIndex(segment Segment, timestamp int64, offset int64) error {
 	return storage.AppendToFile(path, entry)
 }
 
-func getLogPath(segment Segment) string {
-	return filepath.Join(getPartitionPath(segment), getFileName(segment.BaseOffset, "log"))
+func (s *Segment) getLogPath() string {
+	return filepath.Join(getPartitionPath(*s), getFileName(s.BaseOffset, "log"))
 }
 
-func getIndexPath(segment Segment) string {
-	return filepath.Join(getPartitionPath(segment), getFileName(segment.BaseOffset, "index"))
+func (s *Segment) getIndexPath() string {
+	return filepath.Join(getPartitionPath(*s), getFileName(s.BaseOffset, "index"))
 }
 
-func getTimeIndexPath(segment Segment) string {
-	return filepath.Join(getPartitionPath(segment), getFileName(segment.BaseOffset, "timeindex"))
+func (s *Segment) getTimeIndexPath() string {
+	return filepath.Join(getPartitionPath(*s), getFileName(s.BaseOffset, "timeindex"))
 }
 
 func (s *Segment) lookupOffsetPosition(offset int64) (int64, error) {
-	data, err := storage.ReadFile(getIndexPath(*s))
+	data, err := storage.ReadFile(s.getIndexPath())
 	if err != nil {
 		return 0, err
 	}
@@ -126,7 +145,7 @@ func (s *Segment) lookupOffsetPosition(offset int64) (int64, error) {
 }
 
 func (s *Segment) lookupTimestampOffset(timestamp int64) (int64, error) {
-	data, err := storage.ReadFile(getTimeIndexPath(*s))
+	data, err := storage.ReadFile(s.getTimeIndexPath())
 	if err != nil {
 		return 0, err
 	}
@@ -148,34 +167,30 @@ func (s *Segment) lookupTimestampOffset(timestamp int64) (int64, error) {
 	return 0, ErrTimestampNotFound
 }
 
-func (s *Segment) openLogFile() (*os.File, int64, error) {
-	path, err := storage.ResolveFilePath(getLogPath(*s))
-	if err != nil {
-		return nil, 0, err
+func (s *Segment) shouldRollover(logSize int64, record []byte) bool {
+	if s.SegmentBytes > 0 && logSize+HeaderSize+int64(len(record)) > s.SegmentBytes {
+		return true
 	}
 
+	if s.SegmentMs > 0 && time.Now().Unix()-s.CreatedAt > s.SegmentMs {
+		return true
+	}
+
+	return false
+}
+
+func OpenLogFile(path string) (*os.File, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
-	fileInfo, err := file.Stat()
-	if err != nil {
-		file.Close()
-		return nil, 0, err
-	}
-
-	return file, fileInfo.Size(), nil
+	return file, nil
 }
 
-type recordHeader struct {
-	Offset int64
-	Length int32
-}
-
-func (s *Segment) readRecordHeader(file *os.File, position int64) (*recordHeader, error) {
+func ReadRecordHeaderAt(file *os.File, startPosition int64) (*RecordHeader, error) {
 	header := make([]byte, HeaderSize)
-	if _, err := file.ReadAt(header, position); err != nil {
+	if _, err := file.ReadAt(header, startPosition); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrCorruptedSegmentLog, err)
 	}
 
@@ -186,23 +201,23 @@ func (s *Segment) readRecordHeader(file *os.File, position int64) (*recordHeader
 		return nil, err
 	}
 
-	return &recordHeader{
+	return &RecordHeader{
 		Offset: offset,
 		Length: recordLength,
 	}, nil
 }
 
-func (s *Segment) validateRecordHeader(expectedOffset int64, position int64, fileSize int64, header *recordHeader) error {
+func ValidateRecordHeader(expectedOffset int64, position int64, fileSize int64, header *RecordHeader) error {
 	if position < 0 || position >= fileSize {
 		return ErrInvalidRecordPosition
 	}
 
-	if header.Offset != expectedOffset {
-		return ErrOffsetNotFound
-	}
-
 	if header.Length < 0 {
 		return ErrCorruptedSegmentLog
+	}
+
+	if header.Offset != expectedOffset {
+		return ErrOffsetNotFound
 	}
 
 	recordPosition := position + HeaderSize
@@ -214,24 +229,12 @@ func (s *Segment) validateRecordHeader(expectedOffset int64, position int64, fil
 	return nil
 }
 
-func (s *Segment) readRecord(file *os.File, position int64, length int32) ([]byte, error) {
-	record := make([]byte, length)
-	recordPosition := position + HeaderSize
+func ReadRecordAt(file *os.File, startPosition int64, payloadLength int32) ([]byte, error) {
+	record := make([]byte, payloadLength)
+	recordPosition := startPosition + HeaderSize
 	if _, err := file.ReadAt(record, recordPosition); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrCorruptedSegmentLog, err)
 	}
 
 	return record, nil
-}
-
-func (s *Segment) shouldRollover(logSize int64, record []byte) bool {
-	if s.SegmentBytes > 0 && logSize+HeaderSize+int64(len(record)) > s.SegmentBytes {
-		return true
-	}
-
-	if s.SegmentMs > 0 && time.Now().Unix()-s.CreatedAt > s.SegmentMs {
-		return true
-	}
-
-	return false
 }

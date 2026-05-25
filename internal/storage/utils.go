@@ -88,3 +88,38 @@ func GetFileInfo(path string) (os.FileInfo, error) {
 	}
 	return os.Stat(path)
 }
+
+func GetFilesInDir(path string) ([]os.FileInfo, error) {
+	path, err := ResolveFilePath(path)
+	if err != nil {
+		return nil, err
+	}
+
+	exists, err := CheckFolderExists(path)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, fmt.Errorf("Directory does not exist: %s", path)
+	}
+
+	files, err := os.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var fileInfos []os.FileInfo
+
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		info, err := file.Info()
+		if err != nil {
+			return nil, err
+		}
+		fileInfos = append(fileInfos, info)
+	}
+
+	return fileInfos, nil
+}
